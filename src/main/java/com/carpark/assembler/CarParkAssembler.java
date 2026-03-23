@@ -8,10 +8,10 @@ import com.carpark.model.dto.SpotSpec;
 import com.carpark.model.enums.SpotCategory;
 import com.carpark.service.FeeProcessor;
 import com.carpark.service.SpotRegistry;
-import com.carpark.spots.CompactSpot;
-import com.carpark.spots.OversizedSpot;
+import com.carpark.spots.LargeSpot;
+import com.carpark.spots.MediumSpot;
 import com.carpark.spots.ParkingSpot;
-import com.carpark.spots.RegularSpot;
+import com.carpark.spots.SmallSpot;
 import com.carpark.strategy.pricing.HourlyChargePolicy;
 import com.carpark.strategy.selection.ClosestSpotPolicy;
 
@@ -43,6 +43,7 @@ public class CarParkAssembler {
             for (SpotSpec spec : specsOnFloor) {
                 ParkingSpot spot = buildSpot(spec.category, spec.ratePerHour);
                 floor.addSpot(spot);
+                registry.registerSpot(spot);
 
                 for (int eIdx = 0; eIdx < spec.distancesFromEntrances.length; eIdx++) {
                     int dist = spec.distancesFromEntrances[eIdx];
@@ -56,9 +57,9 @@ public class CarParkAssembler {
 
     private static ParkingSpot buildSpot(SpotCategory category, double ratePerHour) {
         return switch (category) {
-            case COMPACT -> new CompactSpot(ratePerHour);
-            case REGULAR -> new RegularSpot(ratePerHour);
-            case OVERSIZED -> new OversizedSpot(ratePerHour);
+            case SMALL  -> new SmallSpot(ratePerHour);
+            case MEDIUM -> new MediumSpot(ratePerHour);
+            case LARGE  -> new LargeSpot(ratePerHour);
         };
     }
 }

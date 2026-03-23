@@ -2,6 +2,7 @@ package com.carpark.service;
 
 import com.carpark.model.ParkReceipt;
 import com.carpark.strategy.pricing.ChargePolicy;
+import java.time.LocalDateTime;
 
 public class FeeProcessor {
     private final ChargePolicy chargePolicy;
@@ -10,7 +11,7 @@ public class FeeProcessor {
         this.chargePolicy = chargePolicy;
     }
 
-    public double computeFee(ParkReceipt receipt) {
-        return chargePolicy.calculateCost(receipt);
+    public double computeFee(ParkReceipt receipt, LocalDateTime exitTime) {
+        return chargePolicy.calculateCost(receipt, exitTime);
     }
 }

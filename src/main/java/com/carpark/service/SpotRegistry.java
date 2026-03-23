@@ -7,14 +7,14 @@ import com.carpark.model.enums.SpotCategory;
 import com.carpark.spots.ParkingSpot;
 import com.carpark.strategy.selection.SpotSelectionPolicy;
 
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class SpotRegistry {
     private final Map<Integer, Entrance> entrances = new ConcurrentHashMap<>();
     private final Map<Integer, Floor> floors = new ConcurrentHashMap<>();
+    private final List<ParkingSpot> allSpots = new ArrayList<>();
     private final SpotSelectionPolicy selectionPolicy;
 
     public SpotRegistry(SpotSelectionPolicy selectionPolicy) {
@@ -31,12 +31,22 @@ public class SpotRegistry {
         return selectionPolicy.findSpot(nearbySpots);
     }
 
+    public Map<SpotCategory, Long> availabilityByCategory() {
+        return allSpots.stream()
+                .filter(spot -> !spot.isTaken())
+                .collect(Collectors.groupingBy(ParkingSpot::getCategory, Collectors.counting()));
+    }
+
     public void registerFloor(Floor floor) {
         floors.put(floor.getFloorId(), floor);
     }
 
     public void registerEntrance(Entrance entrance) {
         entrances.put(entrance.getEntranceId(), entrance);
+    }
+
+    public void registerSpot(ParkingSpot spot) {
+        allSpots.add(spot);
     }
 
     public Floor getFloor(int floorId) {

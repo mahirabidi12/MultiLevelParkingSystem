@@ -2,14 +2,17 @@ package com.carpark;
 
 import com.carpark.assembler.CarParkAssembler;
 import com.carpark.controller.CarPark;
-import com.carpark.model.Car;
 import com.carpark.model.ParkReceipt;
+import com.carpark.model.Vehicle;
 import com.carpark.model.dto.CarParkConfig;
 import com.carpark.model.dto.SpotSpec;
 import com.carpark.model.enums.SpotCategory;
+import com.carpark.model.enums.VehicleType;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -26,37 +29,49 @@ public class ParkingSimulation {
     public static void main(String[] args) throws InterruptedException {
         CarPark carPark = buildCarPark();
 
+        // Print initial slot availability
+        System.out.println("=== Initial Availability ===");
+        printStatus(carPark.status());
+
         ExecutorService pool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         CountDownLatch latch = new CountDownLatch(TOTAL_VEHICLES);
         Random random = new Random();
 
         int totalEntrances = TOTAL_FLOORS * ENTRANCES_PER_FLOOR;
-        SpotCategory[] categories = SpotCategory.values();
+        VehicleType[] vehicleTypes = VehicleType.values();
 
         for (int i = 0; i < TOTAL_VEHICLES; i++) {
             final int vehicleIndex = i;
             pool.submit(() -> {
                 try {
-                    String plate = "CAR-" + String.format("%03d", vehicleIndex);
-                    SpotCategory category = categories[random.nextInt(categories.length)];
-                    Car car = new Car(plate, category);
+                    VehicleType vehicleType = vehicleTypes[random.nextInt(vehicleTypes.length)];
+                    String plate = vehicleType.name().charAt(0) + "-" + String.format("%03d", vehicleIndex);
+                    Vehicle vehicle = new Vehicle(plate, vehicleType);
 
+                    SpotCategory requestedSlot = CarPark.minSlotFor(vehicleType);
                     int entranceId = random.nextInt(totalEntrances);
-                    ParkReceipt receipt = carPark.checkIn(car, entranceId);
+                    LocalDateTime entryTime = LocalDateTime.now();
+
+                    ParkReceipt receipt = carPark.park(vehicle, entryTime, requestedSlot, entranceId);
 
                     if (receipt == null) {
-                        System.out.println(plate + " could not park — lot full for category " + category);
+                        System.out.printf("%s (%s) could not park — no compatible slot available%n", plate, vehicleType);
                         return;
                     }
 
-                    System.out.printf("%s checked in at entrance %d | rate: $%.2f/hr%n",
-                            plate, entranceId, receipt.getReservedSpot().getRatePerHour());
+                    System.out.printf("%s (%s) parked in %s slot %s | rate: $%.2f/hr%n",
+                            plate, vehicleType,
+                            receipt.getAllocatedSlotType(),
+                            receipt.getAllocatedSlotId().substring(0, 8),
+                            receipt.getReservedSpot().getRatePerHour());
 
                     int parkDurationMs = 1000 + random.nextInt(2000);
                     Thread.sleep(parkDurationMs);
 
-                    double fee = carPark.checkOut(receipt.getReceiptId());
-                    System.out.printf("%s checked out | fee: $%.2f%n", plate, fee);
+                    LocalDateTime exitTime = LocalDateTime.now();
+                    double fee = carPark.exit(receipt, exitTime);
+                    System.out.printf("%s exited | billed on %s slot | fee: $%.2f%n",
+                            plate, receipt.getAllocatedSlotType(), fee);
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -68,7 +83,17 @@ public class ParkingSimulation {
 
         latch.await();
         pool.shutdown();
+
+        // Print final slot availability
+        System.out.println("\n=== Final Availability ===");
+        printStatus(carPark.status());
         System.out.println("Simulation complete.");
+    }
+
+    private static void printStatus(Map<SpotCategory, Long> statusMap) {
+        for (SpotCategory cat : SpotCategory.values()) {
+            System.out.printf("  %-8s: %d available%n", cat, statusMap.getOrDefault(cat, 0L));
+        }
     }
 
     private static CarPark buildCarPark() {
